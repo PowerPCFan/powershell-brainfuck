@@ -1,5 +1,11 @@
-function Invoke-Interpreter ([string]$code) {
-    $code = @($code.ToCharArray() | Where-Object { ("><+-.,[]".ToCharArray()) -contains $_ })
+function Invoke-Interpreter ([string]$rawCode) {
+    if ([string]::IsNullOrEmpty($rawCode)) {
+        return
+    }
+    $code = @($rawCode.ToCharArray() | Where-Object {
+        ("><+-.,[]".ToCharArray()) -contains $_
+    })
+
     $memory = New-Object byte[] 30000
     $ptr = 0
     $ip = 0
@@ -13,17 +19,17 @@ function Invoke-Interpreter ([string]$code) {
                 if ($ptr -eq 0) {
                     $ptr = 29999
                 } else {
-                    $ptr = $ptr - 1 
+                    $ptr--
                 }
             }
-            '+' { 
+            '+' {
                 $memory[$ptr] = ($memory[$ptr] + 1) % 256
             }
             '-' {
                 if ($memory[$ptr] -eq 0) {
                     $memory[$ptr] = 255
-                } else { 
-                    $memory[$ptr] = $memory[$ptr] - 1
+                } else {
+                    $memory[$ptr]--
                 }
             }
             '.' {
@@ -40,6 +46,10 @@ function Invoke-Interpreter ([string]$code) {
                     while ($depth -gt 0) {
                         $ip++
 
+                        if ($ip -ge $code.Count) {
+                            break
+                        }
+
                         if ($code[$ip] -eq '[') {
                             $depth++
                         } elseif ($code[$ip] -eq ']') {
@@ -54,6 +64,9 @@ function Invoke-Interpreter ([string]$code) {
 
                     while ($depth -gt 0) {
                         $ip--
+                        if ($ip -lt 0) {
+                            break
+                        }
 
                         if ($code[$ip] -eq ']') {
                             $depth++
@@ -70,10 +83,38 @@ function Invoke-Interpreter ([string]$code) {
 }
 
 function Convert-TextToBF ([string]$text) {
+    if ([string]::IsNullOrEmpty($text)) {
+        return ""
+    }
+
     $bf = ""
+    $currentVal = 0
+
     foreach ($char in $text.ToCharArray()) {
-        $val = [int][char]$char
-        $bf += ("+" * $val) + "." + (">")
+        $targetVal = [int][char]$char
+        $diff = $targetVal - $currentVal
+
+        if ([Math]::Abs($diff) -gt 15) {
+            $bf += "[-]" 
+            $currentVal = 0
+            $factor = [Math]::Floor([Math]::Sqrt($targetVal))
+            if ($factor -lt 2) {
+                $factor = 2
+            }
+            $count = [Math]::Floor($targetVal / $factor)
+            $remainder = $targetVal % $factor
+
+            $bf += (">" + ("+" * $factor) + "[<" + ("+" * $count) + ">-]<" + ("+" * $remainder))
+        } else {
+            if ($diff -gt 0) {
+                $bf += ("+" * $diff)
+            } elseif ($diff -lt 0) {
+                $bf += ("-" * [Math]::Abs($diff))
+            }
+        }
+
+        $bf += "."
+        $currentVal = $targetVal
     }
     return $bf
 }
