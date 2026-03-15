@@ -154,14 +154,27 @@ switch ($choice) {
         Write-Host "`nExecution completed." -ForegroundColor Green
     }
     "2" {
-        $textToConvert = Read-Host "Enter the text to convert"
+        $loadTextFromFile = Read-Host "Load text from file? (y/n)"
+        
+        if ($loadTextFromFile -eq 'y') {
+            $filePath = Read-Host "Enter the file path"
+            if (Test-Path $filePath) {
+                $textToConvert = Get-Content -Path $filePath -Raw
+            } else {
+                Write-Error "$filePath not found."
+                exit
+            }
+        } else {
+            $textToConvert = Read-Host "Enter the text to convert"
+        }
+    
         $generated = Convert-TextToBF $textToConvert
-
+    
         $writeToFile = Read-Host "Write to file? (y/n)"
         if ($writeToFile -eq 'y') {
             $outputFile = Read-Host "Enter output file path"
             $generated | Out-File -FilePath $outputFile
-            Write-Host  -ForegroundColor Green "Brainfuck code written to $outputFile"
+            Write-Host -ForegroundColor Green "Brainfuck code written to $outputFile"
         } else {
             Write-Host "Generated Code:`n" -ForegroundColor Green
             Write-Host $generated
